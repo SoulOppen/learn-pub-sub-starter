@@ -1,7 +1,73 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+
+	"github.com/SoulOppen/learn-pub-sub-starter/internal/gamelogic"
+	"github.com/SoulOppen/learn-pub-sub-starter/internal/pubsub"
+	"github.com/SoulOppen/learn-pub-sub-starter/internal/routing"
+	amqp "github.com/rabbitmq/amqp091-go"
+)
 
 func main() {
-	fmt.Println("Starting Peril server...")
+	connection := "amqp://guest:guest@localhost:5672/"
+	c, err := amqp.Dial(connection)
+	if err != nil {
+		log.Fatal("conecction error")
+	}
+	defer c.Close()
+	log.Printf("Connection successful ✅ ")
+	cha, err := c.Channel()
+	if err != nil {
+		log.Fatal("channel error")
+	}
+	data := routing.PlayingState{
+		IsPaused: true,
+	}
+
+	err = pubsub.PublishJSON(cha, routing.ExchangePerilDirect, routing.PauseKey, data)
+	if err != nil {
+		log.Fatal("publish error")
+	}
+	gamelogic.PrintServerHelp()
+	for {
+		words := gamelogic.GetInput()
+		if len(words) == 0 {
+			continue
+		}
+		switch words[0] {
+		case "pause":
+			fmt.Println("Publishing paused game state")
+			err = pubsub.PublishJSON(
+				cha,
+				routing.ExchangePerilDirect,
+				routing.PauseKey,
+				routing.PlayingState{
+					IsPaused: true,
+				},
+			)
+			if err != nil {
+				log.Printf("could not publish time: %v", err)
+			}
+		case "resume":
+			fmt.Println("Publishing resumes game state")
+			err = pubsub.PublishJSON(
+				cha,
+				routing.ExchangePerilDirect,
+				routing.PauseKey,
+				routing.PlayingState{
+					IsPaused: false,
+				},
+			)
+			if err != nil {
+				log.Printf("could not publish time: %v", err)
+			}
+		case "quit":
+			log.Println("goodbye")
+			return
+		default:
+			log.Println("unknown command")
+		}
+	}
 }
