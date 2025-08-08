@@ -22,14 +22,18 @@ func main() {
 	if err != nil {
 		log.Fatal("channel error")
 	}
-	data := routing.PlayingState{
-		IsPaused: true,
-	}
-
-	err = pubsub.PublishJSON(cha, routing.ExchangePerilDirect, routing.PauseKey, data)
+	_, queue, err := pubsub.DeclareAndBind(
+		c,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		routing.GameLogSlug+".*",
+		pubsub.Durable,
+	)
 	if err != nil {
-		log.Fatal("publish error")
+		log.Fatalf("could not subscribe to pause: %v", err)
 	}
+	fmt.Printf("Queue %v declared and bound!\n", queue.Name)
+
 	gamelogic.PrintServerHelp()
 	for {
 		words := gamelogic.GetInput()
